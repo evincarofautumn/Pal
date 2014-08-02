@@ -17,7 +17,7 @@ canvas {
   border: 1px solid #000;
 }
 
-#xy_canvas, #zy_canvas, #xz_canvas {
+#xy_canvas, #zy_canvas, #xz_canvas, #settings {
   position: absolute;
 }
 
@@ -33,5 +33,12 @@ canvas {
 
 #xz_canvas {
   left: 0;
+  top: 300px;
+}
+
+#settings {
+  padding: 1em;
+  position: absolute;
+  left: 300px;
   top: 300px;
 }

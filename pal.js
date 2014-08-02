@@ -4,11 +4,13 @@ var CONTROL_POINT_ACTIVE_COLOR = 'rgb(128, 192, 255)';
 var CONTROL_POINT_COLOR = 'rgb(0, 128, 255)';
 var CONTROL_POINT_SIZE = 10;
 var DOUBLE_CLICK_THRESHOLD = 400;
+var NUDGE_AMOUNT = 1/20;
 
 function View(parameters) {
   var object = {
     canvas: parameters.canvas,
     context: parameters.canvas.getContext('2d'),
+    editor: parameters.editor,
     palette: parameters.palette,
     x: parameters.x,
     y: parameters.y,
@@ -17,6 +19,8 @@ function View(parameters) {
     drag_origin_y: 0,
     dragging: false,
     last_click: 0,
+    last_cursor_x: 0,
+    last_cursor_y: 0,
     add_node: function(view_x, view_y) {
       var x, y, z;
       switch (this.x) {
@@ -52,7 +56,7 @@ function View(parameters) {
       this.palette.add_node(new Node({ x: x, y: y, z: z }));
     },
     begin_drag: function(x, y) {
-      if (this.dragging)
+      if (this.palette.active_nodes().length === 0 || this.dragging)
         return;
       this.dragging = true;
       this.drag_origin_x = x;
@@ -109,10 +113,12 @@ function View(parameters) {
       this.palette.render();
     },
     mouse_move: function(event) {
+      this.last_cursor_x = event.offsetX;
+      this.last_cursor_y = event.offsetY;
+      this.editor.active_view = this;
       if (this.state === 'DOWN') {
         var active_nodes = this.palette.active_nodes();
-        if (active_nodes.length !== 0)
-          this.begin_drag(event.offsetX, event.offsetY);
+        this.begin_drag(event.offsetX, event.offsetY);
         var delta_x = (event.offsetX - this.drag_origin_x) / CANVAS_SIZE;
         var delta_y = (event.offsetY - this.drag_origin_y) / CANVAS_SIZE;
         this.drag_origin_x = event.offsetX;
@@ -155,6 +161,7 @@ function Editor(parameters) {
       this.palette = new Palette();
       this.palette.add_node(new Node({ x: 0.25, y: 0.50, z: 0.75 }));
       this.palette.add_node(new Node({ x: 0.50, y: 0.25, z: 0.50 }));
+      this.active_view = null;
       this.add_view({ x: 'x', y: 'y', canvas: 'xy_canvas' });
       this.add_view({ x: 'z', y: 'y', canvas: 'zy_canvas' });
       this.add_view({ x: 'x', y: 'z', canvas: 'xz_canvas' });
@@ -166,23 +173,81 @@ function Editor(parameters) {
         x: parameters.x,
         y: parameters.y,
         canvas: document.getElementById(parameters.canvas),
+        editor: this,
         palette: this.palette,
       }));
+    },
+    cancel: function() {
+      if (this.active_view !== null) {
+        this.active_view.state = 'UP';
+        this.active_view.end_drag();
+      }
+      return;
+    },
+    delete_selection: function() {
+      this.palette.active_nodes().forEach(function(node) {
+        self.palette.remove_node(node);
+      });
+    },
+    grab_selection: function() {
+      if (this.active_view === null)
+        return;
+      this.active_view.state = 'DOWN';
+      this.active_view.begin_drag(
+        this.active_view.last_cursor_x,
+        this.active_view.last_cursor_y);
     },
     key_down: function(event) {
       var self = this;
       switch (event.keyCode) {
+      case 13: // RET
+        this.cancel();
+        break;
+      case 27: // ESC
+        this.cancel();
+        break;
+      case 37: // Left
+        this.nudge(-1, 0);
+        break;
+      case 38: // Up
+        this.nudge(0, -1);
+        break;
+      case 39: // Right
+        this.nudge(+1, 0);
+        break;
+      case 40: // Down
+        this.nudge(0, +1);
+        break;
       case 8: // BS
       case 46: // DEL
-        this.palette.active_nodes().forEach(function(node) {
-          self.palette.remove_node(node);
-        });
+        this.delete_selection();
+        break;
+      case 65: // Select [a]ll
+        this.select_all();
+        break;
+      case 71: // [G]rab selection
+        this.grab_selection();
         break;
       }
       this.render();
     },
+    nudge: function(x, y) {
+      if (this.active_view === null)
+        return;
+      var self = this;
+      this.palette.map_nodes(function(node) {
+        node[self.active_view.x] += x * NUDGE_AMOUNT;
+        node[self.active_view.y] += y * NUDGE_AMOUNT;
+      });
+    },
     render: function() {
       this.palette.map_views(function(view) { view.render(); });
+    },
+    select_all: function() {
+      var active = this.palette.active_nodes().length !== this.palette.nodes.length;
+      this.palette.map_nodes(function(node) {
+        node.active = active;
+      });
     },
   };
   object.construct(parameters);

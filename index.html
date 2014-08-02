@@ -7,13 +7,52 @@
 <script src="pal.js"></script>
 </head>
 <body>
-<heading>
-<h1>Pal</h1>
-</heading>
 <article>
 <canvas id="xy_canvas" width="300" height="300"></canvas>
 <canvas id="zy_canvas" width="300" height="300"></canvas>
 <canvas id="xz_canvas" width="300" height="300"></canvas>
+<div id="settings">
+<table>
+<th colspan="2">Mouse</th>
+<tr>
+<td>Click swatch</td>
+<td>Select</td>
+</tr>
+<tr>
+<td><kbd>Shift</kbd> + click swatch</td>
+<td>Add to selection</td>
+</tr>
+<tr>
+<td>Click canvas</td>
+<td>Deselect all</td>
+</tr>
+<tr>
+<td>Double click</td>
+<td>New swatch</td>
+</tr>
+<th colspan="2">Keyboard</th>
+<tr>
+<td><kbd>A</kbd></td>
+<td>Select/deselect all</td>
+</tr>
+<tr>
+<td><kbd>G</kbd></td>
+<td>Grab selection</td>
+</tr>
+<tr>
+<td><kbd>Backspace</kbd>, <kbd>Delete</kbd></td>
+<td>Delete selected swatches</td>
+</tr>
+<tr>
+<td><kbd>Enter</kbd>, <kbd>Escape</kbd></td>
+<td>Finish current action</td>
+</tr>
+<tr>
+<td><kbd>←</kbd>, <kbd>↓</kbd>, <kbd>↑</kbd>, <kbd>→</kbd></td>
+<td>Nudge swatches</td>
+</tr>
+</table>
+</div>
 <script>
 var editor = new Editor({
   xy_canvas: 'xy_canvas',
