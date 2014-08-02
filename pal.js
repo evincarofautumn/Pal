@@ -4,6 +4,7 @@ var CONTROL_POINT_ACTIVE_COLOR = 'rgb(128, 192, 255)';
 var CONTROL_POINT_COLOR = 'rgb(0, 128, 255)';
 var CONTROL_POINT_SIZE = 10;
 var DOUBLE_CLICK_THRESHOLD = 400;
+var EDGE_COLOR = 'rgb(192, 192, 224)';
 var NUDGE_AMOUNT = 1/20;
 
 function View(parameters) {
@@ -139,6 +140,17 @@ function View(parameters) {
     render: function() {
       this.clear();
       var self = this;
+      self.context.strokeStyle = EDGE_COLOR;
+      this.palette.map_edges(function(edge) {
+        self.context.beginPath();
+        self.context.moveTo(
+          edge.start[self.x] * CANVAS_SIZE,
+          edge.start[self.y] * CANVAS_SIZE);
+        self.context.lineTo(
+          edge.end[self.x] * CANVAS_SIZE,
+          edge.end[self.y] * CANVAS_SIZE);
+        self.context.stroke();
+      });
       this.palette.map_nodes(function(node) {
         self.context.fillStyle = node.active
           ? CONTROL_POINT_ACTIVE_COLOR : CONTROL_POINT_COLOR;
@@ -146,8 +158,7 @@ function View(parameters) {
           (node[self.x] * CANVAS_SIZE) - CONTROL_POINT_SIZE / 2,
           (node[self.y] * CANVAS_SIZE) - CONTROL_POINT_SIZE / 2,
           CONTROL_POINT_SIZE,
-          CONTROL_POINT_SIZE
-        );
+          CONTROL_POINT_SIZE);
       });
     },
   };
@@ -185,9 +196,13 @@ function Editor(parameters) {
       return;
     },
     delete_selection: function() {
+      var self = this;
       this.palette.active_nodes().forEach(function(node) {
         self.palette.remove_node(node);
       });
+    },
+    disconnect_nodes: function() {
+      this.palette.disconnect(this.palette.active_nodes());
     },
     grab_selection: function() {
       if (this.active_view === null)
@@ -196,6 +211,15 @@ function Editor(parameters) {
       this.active_view.begin_drag(
         this.active_view.last_cursor_x,
         this.active_view.last_cursor_y);
+    },
+    join_nodes: function() {
+      var active_nodes = this.palette.active_nodes();
+      var self = this;
+      active_nodes.forEach(function(node1) {
+        active_nodes.forEach(function(node2) {
+          self.palette.connect(node1, node2);
+        });
+      });
     },
     key_down: function(event) {
       var self = this;
@@ -222,11 +246,17 @@ function Editor(parameters) {
       case 46: // DEL
         this.delete_selection();
         break;
-      case 65: // Select [a]ll
+      case 65: // A
         this.select_all();
         break;
-      case 71: // [G]rab selection
+      case 71: // G
         this.grab_selection();
+        break;
+      case 74: // J
+        this.join_nodes();
+        break;
+      case 88: // X
+        this.disconnect_nodes();
         break;
       }
       this.render();
@@ -244,6 +274,8 @@ function Editor(parameters) {
       this.palette.map_views(function(view) { view.render(); });
     },
     select_all: function() {
+      if (this.active_view !== null && this.active_view.state === 'DOWN')
+        return;
       var active = this.palette.active_nodes().length !== this.palette.nodes.length;
       this.palette.map_nodes(function(node) {
         node.active = active;
@@ -264,6 +296,14 @@ function Node(parameters) {
   return object;
 }
 
+function Edge(node1, node2) {
+  var object = {
+    start: node1,
+    end: node2,
+  };
+  return object;
+}
+
 function Palette(context) {
   var object = {
     edges: [],
@@ -279,13 +319,28 @@ function Palette(context) {
       this.views.push(view);
     },
     connect: function(node1, node2) {
-      this.edges.push(new Edge(node1, node2));
+      if (!this.connected(node1, node2))
+        this.edges.push(new Edge(node1, node2));
+    },
+    connected: function(node1, node2) {
+      if (node1 === node2)
+        return true;
+      for (var i = 0; i < this.edges.length; ++i) {
+        var edge = this.edges[i];
+        if (edge.start === node1 && edge.end === node2
+          || edge.start === node2 && edge.end === node1)
+          return true;
+      }
+      return false;
     },
     disconnect: function(nodes) {
       this.edges = this.edges.filter(function(x) {
         // Keep edge if at least one of its endpoints is not in the set of nodes.
         return nodes.indexOf(x.start) === -1 || nodes.indexOf(x.end) === -1;
       });
+    },
+    map_edges: function(f) {
+      this.edges.forEach(f);
     },
     map_nodes: function(f) {
       this.nodes.forEach(f);
