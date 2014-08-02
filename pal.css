@@ -1,0 +1,37 @@
+* {
+  margin: 0;
+  padding: 0;
+}
+
+article {
+  margin: 0 auto;
+  position: relative;
+  width: 600px;
+}
+
+heading {
+  text-align: center
+}
+
+canvas {
+  border: 1px solid #000;
+}
+
+#xy_canvas, #zy_canvas, #xz_canvas {
+  position: absolute;
+}
+
+#xy_canvas {
+  left: 0;
+  top: 0;
+}
+
+#zy_canvas {
+  left: 300px;
+  top: 0;
+}
+
+#xz_canvas {
+  left: 0;
+  top: 300px;
+}

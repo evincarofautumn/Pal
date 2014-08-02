@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pal</title>
+<link rel="stylesheet" href="pal.css">
+<script src="pal.js"></script>
+</head>
+<body>
+<heading>
+<h1>Pal</h1>
+</heading>
+<article>
+<canvas id="xy_canvas" width="300" height="300"></canvas>
+<canvas id="zy_canvas" width="300" height="300"></canvas>
+<canvas id="xz_canvas" width="300" height="300"></canvas>
+<script>
+var editor = new Editor({
+  xy_canvas: 'xy_canvas',
+  zy_canvas: 'zy_canvas',
+  xz_canvas: 'xz_canvas',
+});
+editor.render();
+</script>
+</article>
+</body>
+</html>
