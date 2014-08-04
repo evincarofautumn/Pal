@@ -19,6 +19,7 @@ function View(parameters) {
     palette: parameters.palette,
     x: parameters.x,
     y: parameters.y,
+    z: parameters.z,
     selected_nodes: [],
     drag_origin_x: 0,
     drag_origin_y: 0,
@@ -156,20 +157,21 @@ function View(parameters) {
           CONTROL_POINT_SIZE,
           CONTROL_POINT_SIZE);
       });
-      this.palette.map_nodes(function(node) {
+      this.palette.map_nodes_by(this.z, function(node) {
+        var scale = (node[self.z] + 1) / 2;
         var x = Math.floor(
-          (node[self.x] * CANVAS_SIZE) - SWATCH_SIZE / 2) + 0.5;
+          node[self.x] * CANVAS_SIZE - scale * SWATCH_SIZE / 2) + 0.5;
         var y = Math.floor(
-          (node[self.y] * CANVAS_SIZE) - SWATCH_SIZE / 2) + 0.5;
+          node[self.y] * CANVAS_SIZE - scale * SWATCH_SIZE / 2) + 0.5;
         self.context.lineWidth = 1;
         self.context.strokeStyle = SWATCH_ACTIVE_COLOR;
         self.context.fillStyle = self.background(node.x, node.y, node.z);
-        self.context.fillRect(x, y, SWATCH_SIZE, SWATCH_SIZE);
-        self.context.strokeRect(x, y, SWATCH_SIZE, SWATCH_SIZE);
+        self.context.fillRect(x, y, scale * SWATCH_SIZE, scale * SWATCH_SIZE);
+        self.context.strokeRect(x, y, scale * SWATCH_SIZE, scale * SWATCH_SIZE);
         self.context.strokeStyle = node.active
           ? SWATCH_ACTIVE_COLOR : SWATCH_COLOR;
         self.context.strokeRect(
-          x - 1, y - 1, SWATCH_SIZE + 2, SWATCH_SIZE + 2);
+          x - 1, y - 1, scale * SWATCH_SIZE + 2, scale * SWATCH_SIZE + 2);
       });
     },
     render_background: function() {
@@ -241,12 +243,15 @@ function Editor(parameters) {
       this.palette.add_node(new Node({ x: 0.25, y: 0.50, z: 0.75 }));
       this.palette.add_node(new Node({ x: 0.50, y: 0.25, z: 0.50 }));
       this.active_view = null;
-      this.add_view(
-        { x: 'x', y: 'y', background: hsl_background, canvas: 'xy_canvas' });
-      this.add_view(
-        { x: 'z', y: 'y', background: hsl_background, canvas: 'zy_canvas' });
-      this.add_view(
-        { x: 'x', y: 'z', background: hsl_background, canvas: 'xz_canvas' });
+      this.add_view({
+        x: 'x', y: 'y', z: 'z',
+        background: hsl_background, canvas: 'xy_canvas' });
+      this.add_view({
+        x: 'z', y: 'y', z: 'x',
+        background: hsl_background, canvas: 'zy_canvas' });
+      this.add_view({
+        x: 'x', y: 'z', z: 'y',
+        background: hsl_background, canvas: 'xz_canvas' });
       var self = this;
       window.onkeydown = function(event) { self.key_down(event); };
     },
@@ -254,6 +259,7 @@ function Editor(parameters) {
       this.palette.add_view(new View({
         x: parameters.x,
         y: parameters.y,
+        z: parameters.z,
         background: parameters.background,
         canvas: document.getElementById(parameters.canvas),
         editor: this,
@@ -432,6 +438,10 @@ function Palette(context) {
       this.edges.forEach(f);
     },
     map_nodes: function(f) {
+      this.nodes.forEach(f);
+    },
+    map_nodes_by: function(property, f) {
+      this.nodes.sort(function(a, b) { return a[property] - b[property]; });
       this.nodes.forEach(f);
     },
     map_views: function(f) {
