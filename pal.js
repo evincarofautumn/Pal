@@ -1,10 +1,12 @@
 var BACKGROUND_COLOR = 'rgb(40, 40, 50)';
 var CANVAS_SIZE = 300;
-var CONTROL_POINT_ACTIVE_COLOR = 'rgb(128, 192, 255)';
-var CONTROL_POINT_COLOR = 'rgb(0, 128, 255)';
-var CONTROL_POINT_SIZE = 10;
+var CONTROL_POINT_ACTIVE_COLOR = 'rgb(255, 255, 255)';
+var CONTROL_POINT_COLOR = 'rgb(0, 0, 0)';
+var CONTROL_POINT_SIZE = 20;
 var DOUBLE_CLICK_THRESHOLD = 400;
-var EDGE_COLOR = 'rgb(192, 192, 224)';
+var EDGE_COLOR = 'rgb(255, 255, 0)';
+var EDGE_WIDTH = 2;
+var EDGE_SHADOW_COLOR = 'rgb(0, 0, 0)';
 var NUDGE_AMOUNT = 1/20;
 
 function View(parameters) {
@@ -62,8 +64,8 @@ function View(parameters) {
       this.palette.map_nodes(function(node) {
         var left = node[self.x] * CANVAS_SIZE - CONTROL_POINT_SIZE / 2;
         var top = node[self.y] * CANVAS_SIZE - CONTROL_POINT_SIZE / 2;
-        var right = left + CONTROL_POINT_SIZE;
-        var bottom = top + CONTROL_POINT_SIZE;
+        var right = left + CONTROL_POINT_SIZE + 2.0;
+        var bottom = top + CONTROL_POINT_SIZE + 2.0;
         if (event.offsetX >= left && event.offsetY >= top
           && event.offsetX <= right && event.offsetY <= bottom) {
           clicked_node = node;
@@ -113,6 +115,7 @@ function View(parameters) {
       this.clear();
       this.render_background();
       var self = this;
+      self.context.lineWidth = EDGE_WIDTH;
       self.context.strokeStyle = EDGE_COLOR;
       this.palette.map_edges(function(edge) {
         self.context.beginPath();
@@ -125,13 +128,19 @@ function View(parameters) {
         self.context.stroke();
       });
       this.palette.map_nodes(function(node) {
-        self.context.fillStyle = node.active
+        var x = Math.floor(
+          (node[self.x] * CANVAS_SIZE) - CONTROL_POINT_SIZE / 2) + 0.5;
+        var y = Math.floor(
+          (node[self.y] * CANVAS_SIZE) - CONTROL_POINT_SIZE / 2) + 0.5;
+        self.context.lineWidth = 1;
+        self.context.strokeStyle = CONTROL_POINT_ACTIVE_COLOR;
+        self.context.fillStyle = self.background(node.x, node.y, node.z);
+        self.context.fillRect(x, y, CONTROL_POINT_SIZE, CONTROL_POINT_SIZE);
+        self.context.strokeRect(x, y, CONTROL_POINT_SIZE, CONTROL_POINT_SIZE);
+        self.context.strokeStyle = node.active
           ? CONTROL_POINT_ACTIVE_COLOR : CONTROL_POINT_COLOR;
-        self.context.fillRect(
-          (node[self.x] * CANVAS_SIZE) - CONTROL_POINT_SIZE / 2,
-          (node[self.y] * CANVAS_SIZE) - CONTROL_POINT_SIZE / 2,
-          CONTROL_POINT_SIZE,
-          CONTROL_POINT_SIZE);
+        self.context.strokeRect(
+          x - 1, y - 1, CONTROL_POINT_SIZE + 2, CONTROL_POINT_SIZE + 2);
       });
     },
     render_background: function() {
