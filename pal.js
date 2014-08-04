@@ -1,6 +1,10 @@
 var BACKGROUND_COLOR = 'rgb(40, 40, 50)';
 var CANVAS_SIZE = 300;
+var CONTROL_POINT_ACTIVE_COLOR = 'rgb(242, 242, 255)';
+var CONTROL_POINT_COLOR = 'rgb(0, 0, 40)';
 var CONTROL_POINT_SIZE = 10;
+var CONTROL_TANGENT_WIDTH = 0.5;
+var CONTROL_TANGENT_COLOR = 'rgba(0, 0, 40, 50)';
 var DOUBLE_CLICK_THRESHOLD = 400;
 var EDGE_COLOR = 'rgb(255, 255, 0)';
 var EDGE_SHADOW_COLOR = 'rgb(0, 0, 0)';
@@ -20,6 +24,8 @@ function View(parameters) {
     x: parameters.x,
     y: parameters.y,
     z: parameters.z,
+    // Whether higher z-values are farther; default nearer.
+    negate_z: parameters.negate_z === undefined ? false : parameters.negate_z,
     selected_nodes: [],
     drag_origin_x: 0,
     drag_origin_y: 0,
@@ -104,11 +110,15 @@ function View(parameters) {
         active_nodes.forEach(function(node) {
           self.palette.map_edges(function(edge) {
             if (edge.start === node) {
-              edge.control1[self.x] += delta_x;
-              edge.control1[self.y] += delta_y;
+              if (!edge.control1.active) {
+                edge.control1[self.x] += delta_x;
+                edge.control1[self.y] += delta_y;
+              }
             } else if (edge.end === node) {
-              edge.control2[self.x] += delta_x;
-              edge.control2[self.y] += delta_y;
+              if (!edge.control2.active) {
+                edge.control2[self.x] += delta_x;
+                edge.control2[self.y] += delta_y;
+              }
             }
           });
           node[self.x] += delta_x;
@@ -126,10 +136,9 @@ function View(parameters) {
       this.clear();
       this.render_background();
       var self = this;
-      self.context.lineWidth = EDGE_WIDTH;
-      self.context.strokeStyle = EDGE_COLOR;
-      self.context.fillStyle = SWATCH_COLOR;
       this.palette.map_edges(function(edge) {
+        self.context.lineWidth = EDGE_WIDTH;
+        self.context.strokeStyle = EDGE_COLOR;
         self.context.beginPath();
         self.context.moveTo(
           edge.start[self.x] * CANVAS_SIZE,
@@ -142,36 +151,55 @@ function View(parameters) {
           edge.end[self.x] * CANVAS_SIZE,
           edge.end[self.y] * CANVAS_SIZE);
         self.context.stroke();
-        self.context.fillRect(
-          Math.floor(
-            edge.control1[self.x] * CANVAS_SIZE - CONTROL_POINT_SIZE / 2) + 0.5,
-          Math.floor(
-            edge.control1[self.y] * CANVAS_SIZE - CONTROL_POINT_SIZE / 2) + 0.5,
-          CONTROL_POINT_SIZE,
-          CONTROL_POINT_SIZE);
-        self.context.fillRect(
-          Math.floor(
-            edge.control2[self.x] * CANVAS_SIZE - CONTROL_POINT_SIZE / 2) + 0.5,
-          Math.floor(
-            edge.control2[self.y] * CANVAS_SIZE - CONTROL_POINT_SIZE / 2) + 0.5,
-          CONTROL_POINT_SIZE,
-          CONTROL_POINT_SIZE);
+        self.context.lineWidth = CONTROL_TANGENT_WIDTH;
+        self.context.strokeStyle = CONTROL_TANGENT_COLOR;
+        self.context.beginPath();
+        self.context.moveTo(
+          edge.start[self.x] * CANVAS_SIZE,
+          edge.start[self.y] * CANVAS_SIZE);
+        self.context.lineTo(
+          edge.control1[self.x] * CANVAS_SIZE,
+          edge.control1[self.y] * CANVAS_SIZE);
+        self.context.stroke();
+        self.context.beginPath();
+        self.context.moveTo(
+          edge.end[self.x] * CANVAS_SIZE,
+          edge.end[self.y] * CANVAS_SIZE);
+        self.context.lineTo(
+          edge.control2[self.x] * CANVAS_SIZE,
+          edge.control2[self.y] * CANVAS_SIZE);
+        self.context.stroke();
       });
       this.palette.map_nodes_by(this.z, function(node) {
-        var scale = (node[self.z] + 1) / 2;
+        var scale = ((self.negate_z ? 1 - node[self.z] : node[self.z]) + 1) / 2;
         var x = Math.floor(
           node[self.x] * CANVAS_SIZE - scale * SWATCH_SIZE / 2) + 0.5;
         var y = Math.floor(
           node[self.y] * CANVAS_SIZE - scale * SWATCH_SIZE / 2) + 0.5;
-        self.context.lineWidth = 1;
-        self.context.strokeStyle = SWATCH_ACTIVE_COLOR;
-        self.context.fillStyle = self.background(node.x, node.y, node.z);
-        self.context.fillRect(x, y, scale * SWATCH_SIZE, scale * SWATCH_SIZE);
-        self.context.strokeRect(x, y, scale * SWATCH_SIZE, scale * SWATCH_SIZE);
-        self.context.strokeStyle = node.active
-          ? SWATCH_ACTIVE_COLOR : SWATCH_COLOR;
-        self.context.strokeRect(
-          x - 1, y - 1, scale * SWATCH_SIZE + 2, scale * SWATCH_SIZE + 2);
+        if (node.control) {
+          self.context.fillStyle = node.active
+            ? CONTROL_POINT_ACTIVE_COLOR : CONTROL_POINT_COLOR;
+          self.context.beginPath();
+          self.context.arc(
+            Math.floor(
+              node[self.x] * CANVAS_SIZE) + 0.5,
+            Math.floor(
+              node[self.y] * CANVAS_SIZE) + 0.5,
+            scale * CONTROL_POINT_SIZE / 2,
+            0,
+            2 * Math.PI);
+          self.context.fill();
+        } else {
+          self.context.fillStyle = self.background(node.x, node.y, node.z);
+          self.context.fillRect(x, y, scale * SWATCH_SIZE, scale * SWATCH_SIZE);
+          self.context.lineWidth = 1;
+          self.context.strokeStyle = SWATCH_ACTIVE_COLOR;
+          self.context.strokeRect(x, y, scale * SWATCH_SIZE, scale * SWATCH_SIZE);
+          self.context.strokeStyle = node.active
+            ? SWATCH_ACTIVE_COLOR : SWATCH_COLOR;
+          self.context.strokeRect(
+            x - 1, y - 1, scale * SWATCH_SIZE + 2, scale * SWATCH_SIZE + 2);
+        }
       });
     },
     render_background: function() {
@@ -244,7 +272,7 @@ function Editor(parameters) {
       this.palette.add_node(new Node({ x: 0.50, y: 0.25, z: 0.50 }));
       this.active_view = null;
       this.add_view({
-        x: 'x', y: 'y', z: 'z',
+        x: 'x', y: 'y', z: 'z', negate_z: true,
         background: hsl_background, canvas: 'xy_canvas' });
       this.add_view({
         x: 'z', y: 'y', z: 'x',
@@ -260,6 +288,7 @@ function Editor(parameters) {
         x: parameters.x,
         y: parameters.y,
         z: parameters.z,
+        negate_z: parameters.negate_z,
         background: parameters.background,
         canvas: document.getElementById(parameters.canvas),
         editor: this,
@@ -347,12 +376,6 @@ function Editor(parameters) {
         node[self.active_view.x] += x * NUDGE_AMOUNT;
         node[self.active_view.y] += y * NUDGE_AMOUNT;
       });
-      this.palette.map_edges(function(edge) {
-        edge.control1[self.active_view.x] += x * NUDGE_AMOUNT;
-        edge.control1[self.active_view.y] += y * NUDGE_AMOUNT;
-        edge.control2[self.active_view.x] += x * NUDGE_AMOUNT;
-        edge.control2[self.active_view.y] += y * NUDGE_AMOUNT;
-      });
     },
     render: function() {
       this.palette.map_views(function(view) { view.render(); });
@@ -361,7 +384,7 @@ function Editor(parameters) {
       if (this.active_view !== null && this.active_view.state === 'DOWN')
         return;
       var active
-        = this.palette.active_nodes().length !== this.palette.nodes.length;
+        = this.palette.active_nodes().length !== this.palette.node_count();
       this.palette.map_nodes(function(node) {
         node.active = active;
       });
@@ -377,6 +400,7 @@ function Node(parameters) {
     y: parameters.y,
     z: parameters.z,
     active: false,
+    control: parameters.control === undefined ? false : parameters.control,
   };
   return object;
 }
@@ -388,11 +412,13 @@ function Edge(node1, node2) {
       x: node1.x * 2 / 3 + node2.x * 1 / 3,
       y: node1.y * 2 / 3 + node2.y * 1 / 3,
       z: node1.z * 2 / 3 + node2.z * 1 / 3,
+      control: true,
     }),
     control2: new Node({
       x: node1.x * 1 / 3 + node2.x * 2 / 3,
       y: node1.y * 1 / 3 + node2.y * 2 / 3,
       z: node1.z * 1 / 3 + node2.z * 2 / 3,
+      control: true,
     }),
     end: node2,
   };
@@ -405,7 +431,11 @@ function Palette(context) {
     nodes: [],
     views: [],
     active_nodes: function() {
-      return this.nodes.filter(function(node) { return node.active; });
+      var active_nodes = [];
+      this.map_nodes(function(node) {
+        if (node.active) active_nodes.push(node);
+      });
+      return active_nodes;
     },
     add_node: function(node) {
       this.nodes.push(node);
@@ -439,13 +469,20 @@ function Palette(context) {
     },
     map_nodes: function(f) {
       this.nodes.forEach(f);
+      this.edges.forEach(function(edge) {
+        f(edge.control1);
+        f(edge.control2);
+      });
     },
     map_nodes_by: function(property, f) {
       this.nodes.sort(function(a, b) { return a[property] - b[property]; });
-      this.nodes.forEach(f);
+      this.map_nodes(f);
     },
     map_views: function(f) {
       this.views.forEach(f);
+    },
+    node_count: function() {
+      return this.nodes.length + this.edges.length * 2;
     },
     render: function() {
       this.map_views(function(view) { view.render(); });
