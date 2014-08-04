@@ -1,13 +1,14 @@
 var BACKGROUND_COLOR = 'rgb(40, 40, 50)';
 var CANVAS_SIZE = 300;
-var CONTROL_POINT_ACTIVE_COLOR = 'rgb(255, 255, 255)';
-var CONTROL_POINT_COLOR = 'rgb(0, 0, 0)';
-var CONTROL_POINT_SIZE = 20;
+var CONTROL_POINT_SIZE = 10;
 var DOUBLE_CLICK_THRESHOLD = 400;
 var EDGE_COLOR = 'rgb(255, 255, 0)';
-var EDGE_WIDTH = 2;
 var EDGE_SHADOW_COLOR = 'rgb(0, 0, 0)';
+var EDGE_WIDTH = 2;
 var NUDGE_AMOUNT = 1/20;
+var SWATCH_ACTIVE_COLOR = 'rgb(255, 255, 255)';
+var SWATCH_COLOR = 'rgb(0, 0, 0)';
+var SWATCH_SIZE = 20;
 
 function View(parameters) {
   var object = {
@@ -62,10 +63,10 @@ function View(parameters) {
         this.add_node(event.offsetX / CANVAS_SIZE, event.offsetY / CANVAS_SIZE);
       this.last_click = now;
       this.palette.map_nodes(function(node) {
-        var left = node[self.x] * CANVAS_SIZE - CONTROL_POINT_SIZE / 2;
-        var top = node[self.y] * CANVAS_SIZE - CONTROL_POINT_SIZE / 2;
-        var right = left + CONTROL_POINT_SIZE + 2.0;
-        var bottom = top + CONTROL_POINT_SIZE + 2.0;
+        var left = node[self.x] * CANVAS_SIZE - SWATCH_SIZE / 2;
+        var top = node[self.y] * CANVAS_SIZE - SWATCH_SIZE / 2;
+        var right = left + SWATCH_SIZE + 2.0;
+        var bottom = top + SWATCH_SIZE + 2.0;
         if (event.offsetX >= left && event.offsetY >= top
           && event.offsetX <= right && event.offsetY <= bottom) {
           clicked_node = node;
@@ -100,6 +101,15 @@ function View(parameters) {
         this.drag_origin_y = event.offsetY;
         var self = this;
         active_nodes.forEach(function(node) {
+          self.palette.map_edges(function(edge) {
+            if (edge.start === node) {
+              edge.control1[self.x] += delta_x;
+              edge.control1[self.y] += delta_y;
+            } else if (edge.end === node) {
+              edge.control2[self.x] += delta_x;
+              edge.control2[self.y] += delta_y;
+            }
+          });
           node[self.x] += delta_x;
           node[self.y] += delta_y;
         });
@@ -117,30 +127,49 @@ function View(parameters) {
       var self = this;
       self.context.lineWidth = EDGE_WIDTH;
       self.context.strokeStyle = EDGE_COLOR;
+      self.context.fillStyle = SWATCH_COLOR;
       this.palette.map_edges(function(edge) {
         self.context.beginPath();
         self.context.moveTo(
           edge.start[self.x] * CANVAS_SIZE,
           edge.start[self.y] * CANVAS_SIZE);
-        self.context.lineTo(
+        self.context.bezierCurveTo(
+          edge.control1[self.x] * CANVAS_SIZE,
+          edge.control1[self.y] * CANVAS_SIZE,
+          edge.control2[self.x] * CANVAS_SIZE,
+          edge.control2[self.y] * CANVAS_SIZE,
           edge.end[self.x] * CANVAS_SIZE,
           edge.end[self.y] * CANVAS_SIZE);
         self.context.stroke();
+        self.context.fillRect(
+          Math.floor(
+            edge.control1[self.x] * CANVAS_SIZE - CONTROL_POINT_SIZE / 2) + 0.5,
+          Math.floor(
+            edge.control1[self.y] * CANVAS_SIZE - CONTROL_POINT_SIZE / 2) + 0.5,
+          CONTROL_POINT_SIZE,
+          CONTROL_POINT_SIZE);
+        self.context.fillRect(
+          Math.floor(
+            edge.control2[self.x] * CANVAS_SIZE - CONTROL_POINT_SIZE / 2) + 0.5,
+          Math.floor(
+            edge.control2[self.y] * CANVAS_SIZE - CONTROL_POINT_SIZE / 2) + 0.5,
+          CONTROL_POINT_SIZE,
+          CONTROL_POINT_SIZE);
       });
       this.palette.map_nodes(function(node) {
         var x = Math.floor(
-          (node[self.x] * CANVAS_SIZE) - CONTROL_POINT_SIZE / 2) + 0.5;
+          (node[self.x] * CANVAS_SIZE) - SWATCH_SIZE / 2) + 0.5;
         var y = Math.floor(
-          (node[self.y] * CANVAS_SIZE) - CONTROL_POINT_SIZE / 2) + 0.5;
+          (node[self.y] * CANVAS_SIZE) - SWATCH_SIZE / 2) + 0.5;
         self.context.lineWidth = 1;
-        self.context.strokeStyle = CONTROL_POINT_ACTIVE_COLOR;
+        self.context.strokeStyle = SWATCH_ACTIVE_COLOR;
         self.context.fillStyle = self.background(node.x, node.y, node.z);
-        self.context.fillRect(x, y, CONTROL_POINT_SIZE, CONTROL_POINT_SIZE);
-        self.context.strokeRect(x, y, CONTROL_POINT_SIZE, CONTROL_POINT_SIZE);
+        self.context.fillRect(x, y, SWATCH_SIZE, SWATCH_SIZE);
+        self.context.strokeRect(x, y, SWATCH_SIZE, SWATCH_SIZE);
         self.context.strokeStyle = node.active
-          ? CONTROL_POINT_ACTIVE_COLOR : CONTROL_POINT_COLOR;
+          ? SWATCH_ACTIVE_COLOR : SWATCH_COLOR;
         self.context.strokeRect(
-          x - 1, y - 1, CONTROL_POINT_SIZE + 2, CONTROL_POINT_SIZE + 2);
+          x - 1, y - 1, SWATCH_SIZE + 2, SWATCH_SIZE + 2);
       });
     },
     render_background: function() {
@@ -312,6 +341,12 @@ function Editor(parameters) {
         node[self.active_view.x] += x * NUDGE_AMOUNT;
         node[self.active_view.y] += y * NUDGE_AMOUNT;
       });
+      this.palette.map_edges(function(edge) {
+        edge.control1[self.active_view.x] += x * NUDGE_AMOUNT;
+        edge.control1[self.active_view.y] += y * NUDGE_AMOUNT;
+        edge.control2[self.active_view.x] += x * NUDGE_AMOUNT;
+        edge.control2[self.active_view.y] += y * NUDGE_AMOUNT;
+      });
     },
     render: function() {
       this.palette.map_views(function(view) { view.render(); });
@@ -343,6 +378,16 @@ function Node(parameters) {
 function Edge(node1, node2) {
   var object = {
     start: node1,
+    control1: new Node({
+      x: node1.x * 2 / 3 + node2.x * 1 / 3,
+      y: node1.y * 2 / 3 + node2.y * 1 / 3,
+      z: node1.z * 2 / 3 + node2.z * 1 / 3,
+    }),
+    control2: new Node({
+      x: node1.x * 1 / 3 + node2.x * 2 / 3,
+      y: node1.y * 1 / 3 + node2.y * 2 / 3,
+      z: node1.z * 1 / 3 + node2.z * 2 / 3,
+    }),
     end: node2,
   };
   return object;
