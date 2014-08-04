@@ -268,8 +268,6 @@ function Editor(parameters) {
   var object = {
     construct: function(parameters) {
       this.palette = new Palette();
-      this.palette.add_node(new Node({ x: 0.25, y: 0.50, z: 0.75 }));
-      this.palette.add_node(new Node({ x: 0.50, y: 0.25, z: 0.50 }));
       this.active_view = null;
       this.add_view({
         x: 'x', y: 'y', z: 'z', negate_z: true,
