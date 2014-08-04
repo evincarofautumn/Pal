@@ -9,6 +9,7 @@ var NUDGE_AMOUNT = 1/20;
 
 function View(parameters) {
   var object = {
+    background: parameters.background,
     canvas: parameters.canvas,
     context: parameters.canvas.getContext('2d'),
     editor: parameters.editor,
@@ -23,38 +24,9 @@ function View(parameters) {
     last_cursor_x: 0,
     last_cursor_y: 0,
     add_node: function(view_x, view_y) {
-      var x, y, z;
-      switch (this.x) {
-      case 'x':
-        x = view_x;
-        break;
-      case 'y':
-        y = view_x;
-        break;
-      case 'z':
-        z = view_x;
-        break;
-      }
-      switch (this.y) {
-      case 'x':
-        x = view_y;
-        break;
-      case 'y':
-        y = view_y;
-        break;
-      case 'z':
-        z = view_y;
-        break;
-      }
-      var default_value = 0.50;
-      if (x === undefined) {
-        x = default_value;
-      } else if (y === undefined) {
-        y = default_value;
-      } else if (z === undefined) {
-        z = default_value;
-      }
-      this.palette.add_node(new Node({ x: x, y: y, z: z }));
+      var color = this.view_to_color(view_x, view_y, 0.5);
+      this.palette.add_node(
+        new Node({ x: color[0], y: color[1], z: color[2] }));
     },
     begin_drag: function(x, y) {
       if (this.palette.active_nodes().length === 0 || this.dragging)
@@ -139,6 +111,7 @@ function View(parameters) {
     },
     render: function() {
       this.clear();
+      this.render_background();
       var self = this;
       self.context.strokeStyle = EDGE_COLOR;
       this.palette.map_edges(function(edge) {
@@ -161,9 +134,66 @@ function View(parameters) {
           CONTROL_POINT_SIZE);
       });
     },
+    render_background: function() {
+      var CELL_SIZE = 8;
+      for (var view_x = 0; view_x < CANVAS_SIZE; view_x += CELL_SIZE) {
+        for (var view_y = 0; view_y < CANVAS_SIZE; view_y += CELL_SIZE) {
+          var color = this.view_to_color(
+            view_x / CANVAS_SIZE, view_y / CANVAS_SIZE, 0.5);
+          this.context.fillStyle = this.background(
+            color[0], color[1], color[2]);
+          this.context.fillRect(view_x, view_y, CELL_SIZE + 1, CELL_SIZE + 1);
+        }
+      }
+    },
+    view_to_color: function(view_x, view_y, default_value) {
+      var x, y, z;
+      switch (this.x) {
+      case 'x':
+        x = view_x;
+        break;
+      case 'y':
+        y = view_x;
+        break;
+      case 'z':
+        z = view_x;
+        break;
+      }
+      switch (this.y) {
+      case 'x':
+        x = view_y;
+        break;
+      case 'y':
+        y = view_y;
+        break;
+      case 'z':
+        z = view_y;
+        break;
+      }
+      if (x === undefined) {
+        x = default_value;
+      } else if (y === undefined) {
+        y = default_value;
+      } else if (z === undefined) {
+        z = default_value;
+      }
+      return [x, y, z];
+    }
   };
   object.construct();
   return object;
+}
+
+function hsl_background(x, y, z) {
+  return [
+    'hsl(',
+    (x * 360).toString(),
+    ',',
+    (y * 100).toString(),
+    '%,',
+    (z * 100).toString(),
+    '%)',
+  ].join('');
 }
 
 function Editor(parameters) {
@@ -173,9 +203,12 @@ function Editor(parameters) {
       this.palette.add_node(new Node({ x: 0.25, y: 0.50, z: 0.75 }));
       this.palette.add_node(new Node({ x: 0.50, y: 0.25, z: 0.50 }));
       this.active_view = null;
-      this.add_view({ x: 'x', y: 'y', canvas: 'xy_canvas' });
-      this.add_view({ x: 'z', y: 'y', canvas: 'zy_canvas' });
-      this.add_view({ x: 'x', y: 'z', canvas: 'xz_canvas' });
+      this.add_view(
+        { x: 'x', y: 'y', background: hsl_background, canvas: 'xy_canvas' });
+      this.add_view(
+        { x: 'z', y: 'y', background: hsl_background, canvas: 'zy_canvas' });
+      this.add_view(
+        { x: 'x', y: 'z', background: hsl_background, canvas: 'xz_canvas' });
       var self = this;
       window.onkeydown = function(event) { self.key_down(event); };
     },
@@ -183,6 +216,7 @@ function Editor(parameters) {
       this.palette.add_view(new View({
         x: parameters.x,
         y: parameters.y,
+        background: parameters.background,
         canvas: document.getElementById(parameters.canvas),
         editor: this,
         palette: this.palette,
@@ -276,7 +310,8 @@ function Editor(parameters) {
     select_all: function() {
       if (this.active_view !== null && this.active_view.state === 'DOWN')
         return;
-      var active = this.palette.active_nodes().length !== this.palette.nodes.length;
+      var active
+        = this.palette.active_nodes().length !== this.palette.nodes.length;
       this.palette.map_nodes(function(node) {
         node.active = active;
       });
