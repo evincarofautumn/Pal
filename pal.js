@@ -69,7 +69,7 @@ function View(parameters) {
       if (now - this.last_click < DOUBLE_CLICK_THRESHOLD)
         this.add_node(event.offsetX / CANVAS_SIZE, event.offsetY / CANVAS_SIZE);
       this.last_click = now;
-      this.palette.map_nodes(function(node) {
+      this.palette.map_nodes_by(this.z, !this.negate_z, function(node) {
         var left = node[self.x] * CANVAS_SIZE - SWATCH_SIZE / 2;
         var top = node[self.y] * CANVAS_SIZE - SWATCH_SIZE / 2;
         var right = left + SWATCH_SIZE + 2.0;
@@ -170,7 +170,7 @@ function View(parameters) {
           edge.control2[self.y] * CANVAS_SIZE);
         self.context.stroke();
       });
-      this.palette.map_nodes_by(this.z, function(node) {
+      this.palette.map_nodes_by(this.z, !self.negate_z, function(node) {
         var scale = ((self.negate_z ? 1 - node[self.z] : node[self.z]) + 1) / 2;
         var x = Math.floor(
           node[self.x] * CANVAS_SIZE - scale * SWATCH_SIZE / 2) + 0.5;
@@ -472,9 +472,16 @@ function Palette(context) {
         f(edge.control2);
       });
     },
-    map_nodes_by: function(property, f) {
-      this.nodes.sort(function(a, b) { return a[property] - b[property]; });
-      this.map_nodes(f);
+    map_nodes_by: function(property, ascending, f) {
+      var all_nodes = [];
+      this.map_nodes(function(node) {
+        all_nodes.push(node);
+      });
+      all_nodes.sort(
+        ascending
+          ? function(a, b) { return a[property] - b[property]; }
+          : function(a, b) { return b[property] - a[property]; });
+      all_nodes.forEach(f);
     },
     map_views: function(f) {
       this.views.forEach(f);
