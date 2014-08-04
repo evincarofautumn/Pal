@@ -137,6 +137,7 @@ function View(parameters) {
       this.render_background();
       var self = this;
       this.palette.map_edges(function(edge) {
+        // Edge itself.
         self.context.lineWidth = EDGE_WIDTH;
         self.context.strokeStyle = EDGE_COLOR;
         self.context.beginPath();
@@ -151,6 +152,7 @@ function View(parameters) {
           edge.end[self.x] * CANVAS_SIZE,
           edge.end[self.y] * CANVAS_SIZE);
         self.context.stroke();
+        // Tangent lines from endnodes to control nodes.
         self.context.lineWidth = CONTROL_TANGENT_WIDTH;
         self.context.strokeStyle = CONTROL_TANGENT_COLOR;
         self.context.beginPath();
@@ -169,6 +171,21 @@ function View(parameters) {
           edge.control2[self.x] * CANVAS_SIZE,
           edge.control2[self.y] * CANVAS_SIZE);
         self.context.stroke();
+        // Subdivision points.
+        for (var i = 1; i < edge.subdivisions; ++i) {
+          var t = i / edge.subdivisions;
+          self.context.beginPath();
+          self.context.fillStyle = self.background(edge.x(t), edge.y(t), edge.z(t));
+          self.context.strokeStyle = SWATCH_COLOR;
+          self.context.arc(
+            Math.floor(edge[self.x](t) * CANVAS_SIZE) + 0.5,
+            Math.floor(edge[self.y](t) * CANVAS_SIZE) + 0.5,
+            CONTROL_POINT_SIZE / 2,
+            0,
+            2 * Math.PI);
+          self.context.fill();
+          self.context.stroke();
+        }
       });
       this.palette.map_nodes_by(this.z, !self.negate_z, function(node) {
         var scale = ((self.negate_z ? 1 - node[self.z] : node[self.z]) + 1) / 2;
@@ -252,6 +269,52 @@ function View(parameters) {
   return object;
 }
 
+function FlatPalette(parameters) {
+  var object = {
+    context: parameters.context,
+    palette: parameters.palette,
+    construct: function() {
+      this.palette.add_view(this);
+    },
+    render: function() {
+      var entries = [];
+      this.palette.map_nodes(function(node) {
+        if (!node.control) entries.push(node);
+      });
+      this.palette.map_edges(function(edge) {
+        for (var i = 1; i < edge.subdivisions; ++i) {
+          var t = i / edge.subdivisions;
+          entries.push(new Node({
+            x: cubic_bezier(
+              t, edge.start.x, edge.control1.x, edge.control2.x, edge.end.x),
+            y: cubic_bezier(
+              t, edge.start.y, edge.control1.y, edge.control2.y, edge.end.y),
+            z: cubic_bezier(
+              t, edge.start.z, edge.control1.z, edge.control2.z, edge.end.z),
+          }));
+        }
+      });
+      this.context.fillStyle = BACKGROUND_COLOR;
+      this.context.fillRect(0, 0, CANVAS_SIZE, SWATCH_SIZE);
+      var self = this;
+      var x = 0;
+      entries.sort(function(a, b) {
+        return a.x < b.x ? -1 : a.x > b.x ? +1
+          : a.y < b.y ? -1 : a.y > b.y ? +1
+          : a.z < b.z ? -1 : a.z > b.z ? +1
+          : 0;
+      });
+      entries.forEach(function(entry) {
+        self.context.fillStyle = hsl_background(entry.x, entry.y, entry.z);
+        self.context.fillRect(x, 0, SWATCH_SIZE, SWATCH_SIZE);
+        x += SWATCH_SIZE;
+      });
+    },
+  };
+  object.construct();
+  return object;
+}
+
 function hsl_background(x, y, z) {
   return [
     'hsl(',
@@ -278,6 +341,10 @@ function Editor(parameters) {
       this.add_view({
         x: 'x', y: 'z', z: 'y',
         background: hsl_background, canvas: 'xz_canvas' });
+      var flat_context = document.getElementById(parameters.flat_canvas)
+        .getContext('2d');
+      this.flat_palette = new FlatPalette(
+        { context: flat_context, palette: this.palette });
       var self = this;
       window.onkeydown = function(event) { self.key_down(event); };
     },
@@ -360,6 +427,12 @@ function Editor(parameters) {
       case 74: // J
         this.join_nodes();
         break;
+      case 76: // L
+        this.subdivide(-1);
+        break;
+      case 77: // M
+        this.subdivide(+1);
+        break;
       case 88: // X
         this.disconnect_nodes();
         break;
@@ -387,6 +460,12 @@ function Editor(parameters) {
         node.active = active;
       });
     },
+    subdivide: function(amount) {
+      this.palette.map_edges(function(edge) {
+        if (edge.start.active && edge.end.active)
+          edge.subdivisions = Math.max(2, edge.subdivisions + amount);
+      });
+    },
   };
   object.construct(parameters);
   return object;
@@ -401,6 +480,14 @@ function Node(parameters) {
     control: parameters.control === undefined ? false : parameters.control,
   };
   return object;
+}
+
+function cubic_bezier(t, a, b, c, d) {
+  var s = 1 - t;
+  return s * s * s * a
+    + 3 * s * s * t * b
+    + 3 * s * t * t * c
+    + t * t * t * d;
 }
 
 function Edge(node1, node2) {
@@ -419,6 +506,19 @@ function Edge(node1, node2) {
       control: true,
     }),
     end: node2,
+    x: function(t) {
+      return cubic_bezier(
+        t, this.start.x, this.control1.x, this.control2.x, this.end.x);
+    },
+    y: function(t) {
+      return cubic_bezier(
+        t, this.start.y, this.control1.y, this.control2.y, this.end.y);
+    },
+    z: function(t) {
+      return cubic_bezier(
+        t, this.start.z, this.control1.z, this.control2.z, this.end.z);
+    },
+    subdivisions: 2,
   };
   return object;
 }
