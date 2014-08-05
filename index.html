@@ -8,52 +8,84 @@
 </head>
 <body>
 <article>
+<div class="editor">
 <canvas id="xy_canvas" width="300" height="300"></canvas>
 <canvas id="zy_canvas" width="300" height="300"></canvas>
 <canvas id="xz_canvas" width="300" height="300"></canvas>
-<div id="settings">
-<canvas id="flat_canvas" width="300" height="20"></canvas>
-<table>
-<th colspan="2">Mouse</th>
+<canvas id="flat_canvas" width="300" height="300"></canvas>
+</div>
+<div class="settings">
+<table cellspacing="0" cellpadding="0">
+<tr><th colspan="3">Click</th></tr>
 <tr>
-<td>Click swatch</td>
-<td>Select</td>
+<td rowspan="2">Swatch</td>
+<td></td><td>Select</td>
 </tr>
 <tr>
-<td><kbd>Shift</kbd> + click swatch</td>
-<td>Add to selection</td>
+<td><kbd>Shift</kbd></td><td>Add to Selection</td>
 </tr>
 <tr>
-<td>Click canvas</td>
-<td>Deselect all</td>
+<td>Canvas</td>
+<td></td><td>Deselect All</td>
+</tr>
+<tr><th colspan="3">Double Click</th></tr>
+<tr>
+<td>Canvas</td>
+<td></td><td>New Swatch</td>
+</tr>
+<tr><th colspan="3">Keyboard</th></tr>
+<tr>
+<td rowspan="2"><kbd>A</kbd></td>
+<td></td>
+<td><a href="#" onclick="editor.select_all(true)">Select All</a></td>
 </tr>
 <tr>
-<td>Double click</td>
-<td>New swatch</td>
-</tr>
-<th colspan="2">Keyboard</th>
-<tr>
-<td><kbd>A</kbd></td>
-<td>Select/deselect all</td>
+<td><kbd>Shift</kbd></td>
+<td><a href="#" onclick="editor.select_all(false)">Deselect All</a></td>
 </tr>
 <tr>
 <td><kbd>G</kbd></td>
-<td>Grab selection</td>
+<td></td>
+<td>Grab Selection with Mouse</td>
 </tr>
 <tr>
-<td><kbd>Backspace</kbd>, <kbd>Delete</kbd></td>
-<td>Delete selected swatches</td>
+<td><kbd>J</kbd></td>
+<td></td>
+<td><a href="#" onclick="editor.join_nodes()">Join Swatches with Edges</a></td>
 </tr>
 <tr>
-<td><kbd>Enter</kbd>, <kbd>Escape</kbd></td>
-<td>Finish current action</td>
+<td><kbd>L</kbd></td>
+<td></td>
+<td><a href="#" onclick="editor.subdivide(-1)">Less Subvidision on Selected Edges</a></td>
 </tr>
 <tr>
-<td><kbd>←</kbd>, <kbd>↓</kbd>, <kbd>↑</kbd>, <kbd>→</kbd></td>
-<td>Nudge swatches</td>
+<td><kbd>M</kbd></td>
+<td></td>
+<td><a href="#" onclick="editor.subdivide(+1)">More Subvidision on Selected Edges</a></td>
+</tr>
+<tr>
+<td><kbd>X</kbd></td>
+<td></td>
+<td><a href="#" onclick="editor.disconnect_nodes()">Delete Selected Edges</a></td>
+</tr>
+<tr>
+<td><kbd>Delete</kbd><kbd>Backspace</kbd></td>
+<td></td>
+<td><a href="#" onclick="editor.delete_selection()">Delete Selected Swatches</a></td>
+</tr>
+<tr>
+<td><kbd>Enter</kbd><kbd>Esc</kbd></td>
+<td></td>
+<td>Cancel / Release</td>
+</tr>
+<tr>
+<td><kbd>←</kbd><kbd>↓</kbd><kbd>↑</kbd><kbd>→</kbd></td>
+<td></td><td>Nudge Selection</td>
 </tr>
 </table>
 </div>
+<div class="clear"></div>
+</article>
 <script>
 var editor = new Editor({
   xy_canvas: 'xy_canvas',
@@ -63,6 +95,5 @@ var editor = new Editor({
 });
 editor.render();
 </script>
-</article>
 </body>
 </html>

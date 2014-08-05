@@ -3,16 +3,17 @@ var CANVAS_SIZE = 300;
 var CONTROL_POINT_ACTIVE_COLOR = 'rgb(242, 242, 255)';
 var CONTROL_POINT_COLOR = 'rgb(0, 0, 40)';
 var CONTROL_POINT_SIZE = 10;
-var CONTROL_TANGENT_WIDTH = 0.5;
+var CONTROL_TANGENT_WIDTH = 1;
 var CONTROL_TANGENT_COLOR = 'rgba(0, 0, 40, 50)';
 var DOUBLE_CLICK_THRESHOLD = 400;
 var EDGE_COLOR = 'rgb(255, 255, 0)';
-var EDGE_SHADOW_COLOR = 'rgb(0, 0, 0)';
+var EDGE_ACTIVE_COLOR = 'rgb(255, 255, 255)';
 var EDGE_WIDTH = 2;
 var NUDGE_AMOUNT = 1/20;
 var SWATCH_ACTIVE_COLOR = 'rgb(255, 255, 255)';
 var SWATCH_COLOR = 'rgb(0, 0, 0)';
 var SWATCH_SIZE = 20;
+var SUBDIVISION_EDGE_WIDTH = CONTROL_TANGENT_WIDTH / 2;
 
 function View(parameters) {
   var object = {
@@ -137,21 +138,6 @@ function View(parameters) {
       this.render_background();
       var self = this;
       this.palette.map_edges(function(edge) {
-        // Edge itself.
-        self.context.lineWidth = EDGE_WIDTH;
-        self.context.strokeStyle = EDGE_COLOR;
-        self.context.beginPath();
-        self.context.moveTo(
-          edge.start[self.x] * CANVAS_SIZE,
-          edge.start[self.y] * CANVAS_SIZE);
-        self.context.bezierCurveTo(
-          edge.control1[self.x] * CANVAS_SIZE,
-          edge.control1[self.y] * CANVAS_SIZE,
-          edge.control2[self.x] * CANVAS_SIZE,
-          edge.control2[self.y] * CANVAS_SIZE,
-          edge.end[self.x] * CANVAS_SIZE,
-          edge.end[self.y] * CANVAS_SIZE);
-        self.context.stroke();
         // Tangent lines from endnodes to control nodes.
         self.context.lineWidth = CONTROL_TANGENT_WIDTH;
         self.context.strokeStyle = CONTROL_TANGENT_COLOR;
@@ -171,16 +157,39 @@ function View(parameters) {
           edge.control2[self.x] * CANVAS_SIZE,
           edge.control2[self.y] * CANVAS_SIZE);
         self.context.stroke();
+        // Edge itself.
+        self.context.lineWidth = EDGE_WIDTH;
+        self.context.strokeStyle = edge.start.active && edge.end.active
+          ? EDGE_ACTIVE_COLOR : EDGE_COLOR;
+        self.context.beginPath();
+        self.context.moveTo(
+          edge.start[self.x] * CANVAS_SIZE,
+          edge.start[self.y] * CANVAS_SIZE);
+        self.context.bezierCurveTo(
+          edge.control1[self.x] * CANVAS_SIZE,
+          edge.control1[self.y] * CANVAS_SIZE,
+          edge.control2[self.x] * CANVAS_SIZE,
+          edge.control2[self.y] * CANVAS_SIZE,
+          edge.end[self.x] * CANVAS_SIZE,
+          edge.end[self.y] * CANVAS_SIZE);
+        self.context.stroke();
         // Subdivision points.
+        if (!(edge.start.active
+          || edge.control1.active
+          || edge.control2.active
+          || edge.end.active))
+          return;
         for (var i = 1; i < edge.subdivisions; ++i) {
           var t = i / edge.subdivisions;
+          var scale = ((self.negate_z ? 1 - edge[self.z](t) : edge[self.z](t)) + 1) / 2;
           self.context.beginPath();
           self.context.fillStyle = self.background(edge.x(t), edge.y(t), edge.z(t));
           self.context.strokeStyle = SWATCH_COLOR;
+          self.context.lineWidth = SUBDIVISION_EDGE_WIDTH;
           self.context.arc(
             Math.floor(edge[self.x](t) * CANVAS_SIZE) + 0.5,
             Math.floor(edge[self.y](t) * CANVAS_SIZE) + 0.5,
-            CONTROL_POINT_SIZE / 2,
+            scale * CONTROL_POINT_SIZE / 2,
             0,
             2 * Math.PI);
           self.context.fill();
@@ -220,7 +229,7 @@ function View(parameters) {
       });
     },
     render_background: function() {
-      var CELL_SIZE = 8;
+      var CELL_SIZE = CANVAS_SIZE / 40;
       for (var view_x = 0; view_x < CANVAS_SIZE; view_x += CELL_SIZE) {
         for (var view_y = 0; view_y < CANVAS_SIZE; view_y += CELL_SIZE) {
           var color = this.view_to_color(
@@ -295,19 +304,24 @@ function FlatPalette(parameters) {
         }
       });
       this.context.fillStyle = BACKGROUND_COLOR;
-      this.context.fillRect(0, 0, CANVAS_SIZE, SWATCH_SIZE);
+      this.context.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+      entries.sort(function(a, b) {
+        function magnitude(p) {
+          return p.x * p.x + p.y * p.y + p.z * p.z;
+        }
+        return magnitude(a) - magnitude(b);
+      });
       var self = this;
       var x = 0;
-      entries.sort(function(a, b) {
-        return a.x < b.x ? -1 : a.x > b.x ? +1
-          : a.y < b.y ? -1 : a.y > b.y ? +1
-          : a.z < b.z ? -1 : a.z > b.z ? +1
-          : 0;
-      });
+      var y = 0;
       entries.forEach(function(entry) {
         self.context.fillStyle = hsl_background(entry.x, entry.y, entry.z);
-        self.context.fillRect(x, 0, SWATCH_SIZE, SWATCH_SIZE);
+        self.context.fillRect(x, y, SWATCH_SIZE, SWATCH_SIZE);
         x += SWATCH_SIZE;
+        if (x >= CANVAS_SIZE) {
+          x = 0;
+          y += SWATCH_SIZE;
+        }
       });
     },
   };
@@ -365,16 +379,18 @@ function Editor(parameters) {
         this.active_view.state = 'UP';
         this.active_view.end_drag();
       }
-      return;
+      this.render();
     },
     delete_selection: function() {
       var self = this;
       this.palette.active_nodes().forEach(function(node) {
         self.palette.remove_node(node);
       });
+      this.render();
     },
     disconnect_nodes: function() {
       this.palette.disconnect(this.palette.active_nodes());
+      this.render();
     },
     grab_selection: function() {
       if (this.active_view === null)
@@ -383,15 +399,19 @@ function Editor(parameters) {
       this.active_view.begin_drag(
         this.active_view.last_cursor_x,
         this.active_view.last_cursor_y);
+      this.render();
     },
     join_nodes: function() {
       var active_nodes = this.palette.active_nodes();
       var self = this;
       active_nodes.forEach(function(node1) {
+        if (node1.control) return;
         active_nodes.forEach(function(node2) {
+          if (node2.control) return;
           self.palette.connect(node1, node2);
         });
       });
+      this.render();
     },
     key_down: function(event) {
       var self = this;
@@ -419,7 +439,7 @@ function Editor(parameters) {
         this.delete_selection();
         break;
       case 65: // A
-        this.select_all();
+        this.select_all(!event.shiftKey);
         break;
       case 71: // G
         this.grab_selection();
@@ -447,24 +467,25 @@ function Editor(parameters) {
         node[self.active_view.x] += x * NUDGE_AMOUNT;
         node[self.active_view.y] += y * NUDGE_AMOUNT;
       });
+      this.render();
     },
     render: function() {
       this.palette.map_views(function(view) { view.render(); });
     },
-    select_all: function() {
+    select_all: function(active) {
       if (this.active_view !== null && this.active_view.state === 'DOWN')
         return;
-      var active
-        = this.palette.active_nodes().length !== this.palette.node_count();
       this.palette.map_nodes(function(node) {
         node.active = active;
       });
+      this.render();
     },
     subdivide: function(amount) {
       this.palette.map_edges(function(edge) {
         if (edge.start.active && edge.end.active)
           edge.subdivisions = Math.max(2, edge.subdivisions + amount);
       });
+      this.render();
     },
   };
   object.construct(parameters);
